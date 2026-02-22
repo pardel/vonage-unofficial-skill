@@ -58,8 +58,8 @@ Then configure `~/code/vonage/.env`:
 VONAGE_APP_ID=<your application id>
 VONAGE_PRIVATE_KEY_PATH=./private.key
 VONAGE_NUMBER=<your vonage number, no + prefix>
-PUBLIC_URL=http://<your-public-ip>:3000
-PORT=3000
+PUBLIC_URL=http://<your-public-ip>:62529
+PORT=62529
 OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
 OPENCLAW_GATEWAY_TOKEN=<your gateway token>
 ```
@@ -81,7 +81,7 @@ In the Vonage Dashboard → Application:
 ### 5. Firewall
 
 ```bash
-sudo ufw allow 3000/tcp
+sudo ufw allow 62529/tcp
 ```
 
 ### 6. Start
@@ -90,14 +90,14 @@ sudo ufw allow 3000/tcp
 cd ~/code/vonage && node server.js
 ```
 
-Health check: `curl http://localhost:3000/health`
+Health check: `curl http://localhost:62529/health`
 
 ## Sending a Proactive SMS
 
 The server includes a `/send` endpoint for outbound messages:
 
 ```bash
-curl -X POST http://localhost:3000/send \
+curl -X POST http://localhost:62529/send \
   -H 'Content-Type: application/json' \
   -d '{"to": "<recipient_number>", "text": "Hey from OpenClaw!"}'
 ```

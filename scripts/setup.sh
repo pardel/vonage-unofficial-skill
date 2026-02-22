@@ -25,18 +25,87 @@ cat > "$TARGET/package.json" << 'PACKAGE_EOF'
 }
 PACKAGE_EOF
 
-# ── .env template ────────────────────────────────────────────────────────
+# ── .env configuration ───────────────────────────────────────────────────
 if [ ! -f "$TARGET/.env" ]; then
-cat > "$TARGET/.env" << 'ENV_EOF'
-VONAGE_APP_ID=__SET_ME__
+  echo ""
+  echo "── Configuration ──────────────────────────────────────────────────"
+  echo "Enter your credentials below. Press Enter to accept defaults shown in [brackets]."
+  echo ""
+
+  read -rp "Vonage Application ID: " VONAGE_APP_ID
+  while [ -z "$VONAGE_APP_ID" ]; do
+    read -rp "  (required) Vonage Application ID: " VONAGE_APP_ID
+  done
+
+  read -rp "Vonage number (no + prefix): " VONAGE_NUMBER
+  while [ -z "$VONAGE_NUMBER" ]; do
+    read -rp "  (required) Vonage number: " VONAGE_NUMBER
+  done
+
+  echo "Vonage private key — paste the full key below, then press Enter on an empty line:"
+  PRIVATE_KEY=""
+  while IFS= read -r line; do
+    [ -z "$line" ] && [ -n "$PRIVATE_KEY" ] && break
+    PRIVATE_KEY="${PRIVATE_KEY}${line}"$'\n'
+  done
+  if [ -z "$PRIVATE_KEY" ]; then
+    echo "  (required) No private key provided — you must paste it or place it manually at $TARGET/private.key"
+  else
+    printf '%s' "$PRIVATE_KEY" > "$TARGET/private.key"
+    chmod 600 "$TARGET/private.key"
+    echo "[created] $TARGET/private.key"
+  fi
+
+  DETECTED_IP=$(curl -s --max-time 5 https://ifconfig.me 2>/dev/null || echo "")
+  if [ -n "$DETECTED_IP" ]; then
+    read -rp "Server public IP or domain [$DETECTED_IP]: " SERVER_HOST
+    SERVER_HOST="${SERVER_HOST:-$DETECTED_IP}"
+  else
+    read -rp "Server public IP or domain: " SERVER_HOST
+    while [ -z "$SERVER_HOST" ]; do
+      read -rp "  (required) Server public IP or domain: " SERVER_HOST
+    done
+  fi
+  PUBLIC_URL="http://${SERVER_HOST}:62529"
+  PORT=62529
+
+  # Auto-detect OpenClaw gateway
+  DETECTED_GATEWAY_URL=""
+  DETECTED_GATEWAY_TOKEN=""
+  if command -v openclaw &>/dev/null; then
+    DETECTED_GATEWAY_TOKEN=$(openclaw config get gateway.auth.token 2>/dev/null || echo "")
+    DETECTED_GATEWAY_URL="http://127.0.0.1:18789"
+  fi
+
+  if [ -n "$DETECTED_GATEWAY_URL" ]; then
+    read -rp "OpenClaw gateway URL [$DETECTED_GATEWAY_URL]: " OPENCLAW_GATEWAY_URL
+    OPENCLAW_GATEWAY_URL="${OPENCLAW_GATEWAY_URL:-$DETECTED_GATEWAY_URL}"
+  else
+    read -rp "OpenClaw gateway URL [http://127.0.0.1:18789]: " OPENCLAW_GATEWAY_URL
+    OPENCLAW_GATEWAY_URL="${OPENCLAW_GATEWAY_URL:-http://127.0.0.1:18789}"
+  fi
+
+  if [ -n "$DETECTED_GATEWAY_TOKEN" ]; then
+    read -rp "OpenClaw gateway token [detected]: " OPENCLAW_GATEWAY_TOKEN
+    OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-$DETECTED_GATEWAY_TOKEN}"
+  else
+    read -rp "OpenClaw gateway token: " OPENCLAW_GATEWAY_TOKEN
+    while [ -z "$OPENCLAW_GATEWAY_TOKEN" ]; do
+      read -rp "  (required) OpenClaw gateway token: " OPENCLAW_GATEWAY_TOKEN
+    done
+  fi
+
+  cat > "$TARGET/.env" <<EOF
+VONAGE_APP_ID=$VONAGE_APP_ID
 VONAGE_PRIVATE_KEY_PATH=./private.key
-VONAGE_NUMBER=__SET_ME__
-PUBLIC_URL=http://__YOUR_PUBLIC_IP__:3000
-PORT=3000
-OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
-OPENCLAW_GATEWAY_TOKEN=__SET_ME__
-ENV_EOF
-  echo "[created] $TARGET/.env — edit with your credentials"
+VONAGE_NUMBER=$VONAGE_NUMBER
+PUBLIC_URL=$PUBLIC_URL
+PORT=$PORT
+OPENCLAW_GATEWAY_URL=$OPENCLAW_GATEWAY_URL
+OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN
+EOF
+  echo ""
+  echo "[created] $TARGET/.env"
 else
   echo "[skip] $TARGET/.env already exists"
 fi
@@ -65,7 +134,7 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '62529', 10);
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://127.0.0.1:${PORT}`;
 const VONAGE_APP_ID = process.env.VONAGE_APP_ID;
 const VONAGE_PRIVATE_KEY = fs.readFileSync(
@@ -373,17 +442,19 @@ SERVER_EOF
 # ── Install dependencies ─────────────────────────────────────────────────
 cd "$TARGET" && npm install
 
+PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:62529}"
+
 echo ""
 echo "Vonage SMS + Voice server created at $TARGET"
 echo ""
-echo "Next steps:"
-echo "  1. Edit $TARGET/.env with your credentials"
-echo "  2. Place your Vonage private key at $TARGET/private.key"
-echo "  3. Enable Messages + Voice capabilities on your Vonage app"
-echo "  4. Set Default SMS Setting to 'Messages API' in Vonage Dashboard"
-echo "  5. Set Vonage webhook URLs:"
-echo "     - Messages inbound: <PUBLIC_URL>/webhooks/inbound"
-echo "     - Messages status:  <PUBLIC_URL>/webhooks/status"
-echo "     - Voice answer:     <PUBLIC_URL>/webhooks/answer"
-echo "     - Voice event:      <PUBLIC_URL>/webhooks/event"
-echo "  6. Run: cd $TARGET && node server.js"
+if [ ! -f "$TARGET/private.key" ]; then
+  echo "  Place your Vonage private key at $TARGET/private.key"
+  echo ""
+fi
+echo "Double-check that your Vonage application webhooks are configured with:"
+echo "  Voice — Answer URL:     $PUBLIC_URL/webhooks/answer"
+echo "  Voice — Event URL:      $PUBLIC_URL/webhooks/event"
+echo "  Messages — Inbound URL: $PUBLIC_URL/webhooks/inbound"
+echo "  Messages — Status URL:  $PUBLIC_URL/webhooks/status"
+echo ""
+echo "Start the server: cd $TARGET && node server.js"
