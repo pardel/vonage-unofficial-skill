@@ -56,7 +56,7 @@ if [ ! -f "$TARGET/.env" ]; then
     echo "[created] $TARGET/private.key"
   fi
 
-  DETECTED_IP=$(curl -s --max-time 5 https://ifconfig.me 2>/dev/null || echo "")
+  DETECTED_IP=$(curl -4 -s --max-time 5 https://ifconfig.me 2>/dev/null || echo "")
   if [ -n "$DETECTED_IP" ]; then
     read -rp "Server public IP or domain [$DETECTED_IP]: " SERVER_HOST
     SERVER_HOST="${SERVER_HOST:-$DETECTED_IP}"
