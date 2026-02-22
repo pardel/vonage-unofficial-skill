@@ -9,7 +9,7 @@ Call → Vonage → Express webhook server → OpenClaw gateway → Agent
 
 ## Setup
 
-See [SKILL.md](SKILL.md) for full setup instructions, configuration, tuning, and troubleshooting.
+See [this blogpost](https://www.pardel.dev/2026/02/21/openclaw.html) for full setup instructions, configuration, tuning, and troubleshooting.
 
 ## Files
 
